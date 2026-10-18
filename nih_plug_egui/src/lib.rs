@@ -72,8 +72,8 @@ impl Default for EguiSettings {
 
 /// Create an [`Editor`] instance using an [`egui`][::egui] GUI. Using the user state parameter is
 /// optional, but it can be useful for keeping track of some temporary GUI-only settings. See the
-/// `gui_gain` example for more information on how to use this. The [`EguiState`] passed to this
-/// function contains the GUI's intitial size, and this is kept in sync whenever the GUI gets
+/// `nih_plug_gain_egui` example for more information on how to use this. The [`EguiState`] passed
+/// to this function contains the GUI's intitial size, and this is kept in sync whenever the GUI gets
 /// resized. You can also use this to know if the GUI is open, so you can avoid performing
 /// potentially expensive calculations while the GUI is not open. If you want this size to be
 /// persisted when restoring a plugin instance, then you can store it in a `#[persist = "key"]`

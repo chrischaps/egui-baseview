@@ -19,7 +19,6 @@ use std::sync::Arc;
 /// An [`Editor`] implementation that calls an egui draw loop.
 pub(crate) struct EguiEditor<T> {
     pub(crate) egui_state: Arc<EguiState>,
-    /// The plugin's state. This is kept in between editor openenings.
     pub(crate) user_state: Arc<Mutex<T>>,
 
     pub(crate) settings: Arc<EguiSettings>,
