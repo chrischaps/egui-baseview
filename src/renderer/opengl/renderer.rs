@@ -102,9 +102,10 @@ impl Renderer {
             self.glow_context.clear(egui_glow::glow::COLOR_BUFFER_BIT);
         }
 
-        for (id, image_deltas) in &textures_delta.set {
-            for image_delta in image_deltas {
-                self.painter.set_texture(*id, image_delta);
+        // Drained: egui 0.37 asserts in debug builds that every delta is used
+        for (id, image_deltas) in textures_delta.set.drain() {
+            for image_delta in &image_deltas {
+                self.painter.set_texture(id, image_delta);
             }
         }
 
