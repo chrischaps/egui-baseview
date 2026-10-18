@@ -114,6 +114,8 @@ where
     viewport_id: egui::ViewportId,
     start_time: Instant,
     egui_input: egui::RawInput,
+    /// The keys held, which egui (since 0.36) learns from `Event::ModifiersChanged`.
+    modifiers: egui::Modifiers,
     pointer_pos_in_points: Option<egui::Pos2>,
     current_cursor_icon: baseview::MouseCursor,
 
@@ -222,6 +224,7 @@ where
             viewport_id,
             start_time,
             egui_input,
+            modifiers: egui::Modifiers::default(),
             pointer_pos_in_points: None,
             current_cursor_icon: baseview::MouseCursor::Default,
 
@@ -313,9 +316,21 @@ where
 
     /// Update the pressed key modifiers when a mouse event has sent a new set of modifiers.
     fn update_modifiers(&mut self, modifiers: &Modifiers) {
-        self.egui_input.modifiers.alt = !(*modifiers & Modifiers::ALT).is_empty();
-        self.egui_input.modifiers.shift = !(*modifiers & Modifiers::SHIFT).is_empty();
-        self.egui_input.modifiers.command = !(*modifiers & Modifiers::CONTROL).is_empty();
+        let mut next = self.modifiers;
+        next.alt = !(*modifiers & Modifiers::ALT).is_empty();
+        next.shift = !(*modifiers & Modifiers::SHIFT).is_empty();
+        next.command = !(*modifiers & Modifiers::CONTROL).is_empty();
+        self.set_modifiers(next);
+    }
+
+    /// Hold `modifiers`, telling egui when they change.
+    fn set_modifiers(&mut self, modifiers: egui::Modifiers) {
+        if modifiers != self.modifiers {
+            self.modifiers = modifiers;
+            self.egui_input
+                .events
+                .push(egui::Event::ModifiersChanged(modifiers));
+        }
     }
 }
 
@@ -413,6 +428,8 @@ where
                         error!("Open error: {}", err);
                     }
                 }
+                // For a PRIMARY selection, which baseview's windows don't keep.
+                egui::OutputCommand::TextSelectionSettled(_) => {}
             }
         }
 
@@ -465,7 +482,7 @@ where
                                 pos,
                                 button,
                                 pressed: true,
-                                modifiers: self.egui_input.modifiers,
+                                modifiers: self.modifiers,
                             });
                         }
                     }
@@ -479,7 +496,7 @@ where
                                 pos,
                                 button,
                                 pressed: false,
-                                modifiers: self.egui_input.modifiers,
+                                modifiers: self.modifiers,
                             });
                         }
                     }
@@ -513,8 +530,9 @@ where
                     self.egui_input.events.push(egui::Event::MouseWheel {
                         unit,
                         delta,
-                        modifiers: self.egui_input.modifiers,
+                        modifiers: self.modifiers,
                         phase: egui::TouchPhase::Move,
+                        source: egui::MouseWheelSource::Unknown,
                     });
                 }
                 baseview::MouseEvent::CursorLeft => {
@@ -528,27 +546,29 @@ where
 
                 let pressed = event.state == keyboard_types::KeyState::Down;
 
+                let mut modifiers = self.modifiers;
                 match event.code {
-                    Code::ShiftLeft | Code::ShiftRight => self.egui_input.modifiers.shift = pressed,
+                    Code::ShiftLeft | Code::ShiftRight => modifiers.shift = pressed,
                     Code::ControlLeft | Code::ControlRight => {
-                        self.egui_input.modifiers.ctrl = pressed;
+                        modifiers.ctrl = pressed;
 
                         #[cfg(not(target_os = "macos"))]
                         {
-                            self.egui_input.modifiers.command = pressed;
+                            modifiers.command = pressed;
                         }
                     }
-                    Code::AltLeft | Code::AltRight => self.egui_input.modifiers.alt = pressed,
+                    Code::AltLeft | Code::AltRight => modifiers.alt = pressed,
                     Code::MetaLeft | Code::MetaRight => {
                         #[cfg(target_os = "macos")]
                         {
-                            self.egui_input.modifiers.mac_cmd = pressed;
-                            self.egui_input.modifiers.command = pressed;
+                            modifiers.mac_cmd = pressed;
+                            modifiers.command = pressed;
                         }
                         // prevent `rustfmt` from breaking this
                     }
                     _ => (),
                 }
+                self.set_modifiers(modifiers);
 
                 if let Some(key) = crate::translate::translate_virtual_key(&event.key) {
                     self.egui_input.events.push(egui::Event::Key {
@@ -556,7 +576,7 @@ where
                         physical_key: None,
                         pressed,
                         repeat: event.repeat,
-                        modifiers: self.egui_input.modifiers,
+                        modifiers: self.modifiers,
                     });
                 }
 
@@ -565,11 +585,11 @@ where
                     // so we detect these things manually:
                     //
                     // TODO: See if this is an issue in baseview as well.
-                    if is_cut_command(self.egui_input.modifiers, event.code) {
+                    if is_cut_command(self.modifiers, event.code) {
                         self.egui_input.events.push(egui::Event::Cut);
-                    } else if is_copy_command(self.egui_input.modifiers, event.code) {
+                    } else if is_copy_command(self.modifiers, event.code) {
                         self.egui_input.events.push(egui::Event::Copy);
-                    } else if is_paste_command(self.egui_input.modifiers, event.code) {
+                    } else if is_paste_command(self.modifiers, event.code) {
                         if let Some(clipboard_ctx) = &mut self.clipboard_ctx {
                             match clipboard_ctx.get_contents() {
                                 Ok(contents) => {
@@ -581,7 +601,7 @@ where
                             }
                         }
                     } else if let keyboard_types::Key::Character(written) = &event.key {
-                        if !self.egui_input.modifiers.ctrl && !self.egui_input.modifiers.command {
+                        if !self.modifiers.ctrl && !self.modifiers.command {
                             self.egui_input
                                 .events
                                 .push(egui::Event::Text(written.clone()));
