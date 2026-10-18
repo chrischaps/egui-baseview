@@ -104,7 +104,7 @@ pub enum KeyCapture {
 pub struct EguiWindow<State, U>
 where
     State: 'static + Send,
-    U: FnMut(&egui::Context, &mut Queue, &mut State),
+    U: FnMut(&mut egui::Ui, &mut Queue, &mut State),
     U: 'static + Send,
 {
     user_state: Option<State>,
@@ -134,7 +134,7 @@ where
 impl<State, U> EguiWindow<State, U>
 where
     State: 'static + Send,
-    U: FnMut(&egui::Context, &mut Queue, &mut State),
+    U: FnMut(&mut egui::Ui, &mut Queue, &mut State),
     U: 'static + Send,
 {
     fn new<B>(
@@ -322,7 +322,7 @@ where
 impl<State, U> WindowHandler for EguiWindow<State, U>
 where
     State: 'static + Send,
-    U: FnMut(&egui::Context, &mut Queue, &mut State),
+    U: FnMut(&mut egui::Ui, &mut Queue, &mut State),
     U: 'static + Send,
 {
     fn on_frame(&mut self, window: &mut Window) {
@@ -336,8 +336,6 @@ where
             self.points_per_pixel,
         ));
 
-        self.egui_ctx.begin_pass(self.egui_input.take());
-
         //let mut repaint_requested = false;
         let mut queue = Queue::new(
             &mut self.bg_color,
@@ -346,15 +344,14 @@ where
             &mut self.key_capture,
         );
 
-        (self.user_update)(&self.egui_ctx, &mut queue, state);
+        let user_update = &mut self.user_update;
+        let mut full_output = self.egui_ctx.run_ui(self.egui_input.take(), |ui| {
+            user_update(ui, &mut queue, state);
+        });
 
         if self.close_requested {
             window.close();
         }
-
-        // Prevent data from being allocated every frame by storing this
-        // in a member field.
-        let mut full_output = self.egui_ctx.end_pass();
 
         let Some(viewport_output) = full_output.viewport_output.get(&self.viewport_id) else {
             // The main window was closed by egui.

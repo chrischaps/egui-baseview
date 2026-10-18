@@ -22,7 +22,8 @@ fn main() {
         |_egui_ctx: &Context, _queue: &mut Queue, _state: &mut State| {},
         // Called before each frame. Here you should update the state of your
         // application and build the UI.
-        |egui_ctx: &Context, queue: &mut Queue, state: &mut State| {
+        |ui: &mut egui::Ui, queue: &mut Queue, state: &mut State| {
+            let egui_ctx = ui.ctx();
             egui::Window::new("egui-baseview simple demo").show(egui_ctx, |ui| {
                 ui.heading("My Egui Application");
                 ui.horizontal(|ui| {
